@@ -7,38 +7,64 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// This will store our poll data in memory for this simple example
-const pollData = {
+// This object will now hold the data for all active rooms
+// Example: { '123456': { question: '...', options: {...} } }
+const rooms = {};
+
+// The default poll structure for a new room
+const defaultPoll = {
     question: "What is your favorite programming language?",
     options: { "JavaScript": 0, "Python": 0, "Rust": 0, "Go": 0 },
 };
 
-// This line tells Express to serve the files inside the 'public' folder
 app.use(express.static('public'));
 
-// This is where we handle all the real-time magic
 io.on('connection', (socket) => {
-    console.log('A user connected');
+    // --- PRESENTER EVENTS ---
+    socket.on('create_room', () => {
+        // Generate a random 6-digit code
+        let roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Ensure the code is unique
+        while(rooms[roomCode]) {
+            roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+        }
 
-    // When a new user connects, immediately send them the current poll status
-    socket.emit('update', pollData);
+        socket.join(roomCode);
+        rooms[roomCode] = JSON.parse(JSON.stringify(defaultPoll)); // Create a fresh copy of the poll
+        
+        console.log(`Presenter created and joined room ${roomCode}`);
+        socket.emit('room_created', { roomCode, pollData: rooms[roomCode] });
+    });
 
-    // When a user sends a 'vote' event, we update the data
-    socket.on('vote', (option) => {
-        if (pollData.options.hasOwnProperty(option)) {
-            pollData.options[option]++;
-            // After updating, send the new data to EVERYONE connected
-            io.emit('update', pollData);
+    // --- PARTICIPANT EVENTS ---
+    socket.on('join_room', (roomCode) => {
+        if (rooms[roomCode]) {
+            socket.join(roomCode);
+            console.log(`Participant joined room ${roomCode}`);
+            // Send the current poll data to the participant who just joined
+            socket.emit('update', rooms[roomCode]);
+        } else {
+            socket.emit('error_message', 'Room not found.');
         }
     });
 
-    // Handle when a user closes their browser
+    socket.on('vote', ({ roomCode, option }) => {
+        const room = rooms[roomCode];
+        if (room && room.options.hasOwnProperty(option)) {
+            room.options[option]++;
+            // Broadcast the update ONLY to clients in that specific room
+            io.to(roomCode).emit('update', room);
+        }
+    });
+    
     socket.on('disconnect', () => {
-        console.log('User disconnected');
+        console.log('A user disconnected');
+        // Here you might add logic to clean up empty rooms
     });
 });
 
-const PORT = process.env.PORT || 3000; // Use the host's port, or 3000 for local development
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });

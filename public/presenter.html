@@ -2,31 +2,39 @@
 <html>
 <head>
     <title>Presenter View</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; }
-        #results div { font-size: 1.5rem; margin: 10px; }
-    </style>
+    <style>body { font-family: sans-serif; text-align: center; }</style>
 </head>
 <body>
-    <h1>Live Poll Results</h1>
+    <h1>Your Room Code: <span id="room-code" style="color: blue;"></span></h1>
     <h2 id="question"></h2>
     <div id="results"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        const roomCodeEl = document.getElementById('room-code');
         const questionEl = document.getElementById('question');
         const resultsEl = document.getElementById('results');
 
-        // Listen for 'update' events from the server
+        // Automatically ask the server to create a room when the page loads
+        socket.emit('create_room');
+
+        socket.on('room_created', ({ roomCode, pollData }) => {
+            roomCodeEl.textContent = roomCode;
+            updateDisplay(pollData);
+        });
+
         socket.on('update', (pollData) => {
+            updateDisplay(pollData);
+        });
+
+        function updateDisplay(pollData) {
             questionEl.textContent = pollData.question;
             resultsEl.innerHTML = '';
-            // Display each option and its vote count
             for (const [option, votes] of Object.entries(pollData.options)) {
                 resultsEl.innerHTML += `<div>${option}: ${votes}</div>`;
             }
-        });
+        }
     </script>
 </body>
 </html>

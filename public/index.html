@@ -1,27 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Participant View</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; }
-        button { font-size: 1.2rem; padding: 10px 20px; margin: 5px; cursor: pointer; }
-    </style>
+    <title>Join Poll</title>
+    <style>body { font-family: sans-serif; text-align: center; }</style>
 </head>
 <body>
-    <h1 id="question">Loading...</h1>
-    <div id="options"></div>
+    <div id="join-view">
+        <h1>Join a Live Poll</h1>
+        <input type="text" id="room-code-input" placeholder="Enter Room Code">
+        <button onclick="joinRoom()">Join</button>
+        <p id="error-message" style="color: red;"></p>
+    </div>
+
+    <div id="poll-view" style="display: none;">
+        <h1 id="question"></h1>
+        <div id="options"></div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const questionEl = document.getElementById('question');
-        const optionsEl = document.getElementById('options');
+        let currentRoom = '';
 
-        // Listen for 'update' events from the server
+        const joinView = document.getElementById('join-view');
+        const pollView = document.getElementById('poll-view');
+        const errorEl = document.getElementById('error-message');
+
+        function joinRoom() {
+            const roomCodeInput = document.getElementById('room-code-input');
+            const roomCode = roomCodeInput.value.trim();
+            if (roomCode) {
+                currentRoom = roomCode;
+                socket.emit('join_room', roomCode);
+            }
+        }
+
         socket.on('update', (pollData) => {
+            joinView.style.display = 'none';
+            pollView.style.display = 'block';
+            
+            const questionEl = document.getElementById('question');
+            const optionsEl = document.getElementById('options');
+
             questionEl.textContent = pollData.question;
             optionsEl.innerHTML = '';
-            // Create a button for each option
             for (const option in pollData.options) {
                 const button = document.createElement('button');
                 button.textContent = option;
@@ -30,11 +52,14 @@
             }
         });
 
-        // Send a 'vote' event to the server when a button is clicked
         function vote(option) {
-            socket.emit('vote', option);
-            optionsEl.innerHTML = '<h2>Thank you for your vote!</h2>';
+            socket.emit('vote', { roomCode: currentRoom, option: option });
+            pollView.innerHTML = '<h2>Thank you for your vote!</h2>';
         }
+        
+        socket.on('error_message', (msg) => {
+            errorEl.textContent = msg;
+        });
     </script>
 </body>
 </html>
