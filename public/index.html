@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Participant View</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
+        button { font-size: 1.2rem; padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1 id="question">Loading...</h1>
+    <div id="options"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const questionEl = document.getElementById('question');
+        const optionsEl = document.getElementById('options');
+
+        // Listen for 'update' events from the server
+        socket.on('update', (pollData) => {
+            questionEl.textContent = pollData.question;
+            optionsEl.innerHTML = '';
+            // Create a button for each option
+            for (const option in pollData.options) {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.onclick = () => vote(option);
+                optionsEl.appendChild(button);
+            }
+        });
+
+        // Send a 'vote' event to the server when a button is clicked
+        function vote(option) {
+            socket.emit('vote', option);
+            optionsEl.innerHTML = '<h2>Thank you for your vote!</h2>';
+        }
+    </script>
+</body>
+</html>
